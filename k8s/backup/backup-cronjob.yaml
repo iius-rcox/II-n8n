@@ -5,10 +5,13 @@ metadata:
   namespace: n8n-prod
 spec:
   schedule: "0 2 * * *"  # Daily at 2 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
   jobTemplate:
     spec:
       template:
         spec:
+          serviceAccountName: n8n-backup
           containers:
           - name: backup
             image: mcr.microsoft.com/azure-cli:latest
@@ -16,38 +19,114 @@ spec:
             - /bin/bash
             - -c
             - |
-              # Create backup directory
+              set -euo pipefail
+              
+              # Configuration
               BACKUP_DATE=$(date +%Y%m%d-%H%M%S)
-              BACKUP_DIR="/backup/n8n-$BACKUP_DATE"
+              BACKUP_DIR="/tmp/backup/n8n-$BACKUP_DATE"
+              BACKUP_FILE="/tmp/n8n-backup-$BACKUP_DATE.tar.gz"
+              RETENTION_DAYS=30
               
-              # Copy n8n data
-              cp -r /n8n-data/* $BACKUP_DIR/
+              echo "Starting backup at $(date)"
+              echo "Backup directory: $BACKUP_DIR"
               
-              # Compress and upload to Azure Storage
-              tar -czf /tmp/n8n-backup-$BACKUP_DATE.tar.gz -C /backup n8n-$BACKUP_DATE
+              # Create backup directory
+              mkdir -p "$BACKUP_DIR"
               
-              # Upload to Azure Blob Storage (configure with managed identity)
+              # Copy n8n data with error checking
+              if [ ! -d "/n8n-data" ]; then
+                echo "ERROR: Source directory /n8n-data not found"
+                exit 1
+              fi
+              
+              echo "Copying n8n data..."
+              cp -r /n8n-data/* "$BACKUP_DIR/" || {
+                echo "ERROR: Failed to copy n8n data"
+                exit 1
+              }
+              
+              # Create manifest file
+              echo "Creating backup manifest..."
+              cat > "$BACKUP_DIR/backup-manifest.json" << EOF
+              {
+                "backup_date": "$BACKUP_DATE",
+                "backup_type": "full",
+                "source_path": "/n8n-data",
+                "kubernetes_namespace": "n8n-prod",
+                "files_count": $(find "$BACKUP_DIR" -type f | wc -l)
+              }
+              EOF
+              
+              # Create compressed archive
+              echo "Creating compressed archive..."
+              cd /tmp/backup
+              tar -czf "$BACKUP_FILE" "n8n-$BACKUP_DATE" || {
+                echo "ERROR: Failed to create backup archive"
+                exit 1
+              }
+              
+              # Get file size for logging
+              BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+              echo "Backup created successfully. Size: $BACKUP_SIZE"
+              
+              # Authenticate with managed identity
+              echo "Authenticating with Azure..."
+              az login --identity || {
+                echo "ERROR: Failed to authenticate with managed identity"
+                exit 1
+              }
+              
+              # Upload to Azure Storage
+              echo "Uploading to Azure Storage..."
               az storage blob upload \
-                --file /tmp/n8n-backup-$BACKUP_DATE.tar.gz \
+                --file "$BACKUP_FILE" \
                 --container-name n8n-backups \
-                --name n8n-backup-$BACKUP_DATE.tar.gz \
-                --account-name your-storage-account
+                --name "n8n-backup-$BACKUP_DATE.tar.gz" \
+                --account-name "${AZURE_STORAGE_ACCOUNT}" \
+                --auth-mode login || {
+                echo "ERROR: Failed to upload backup to Azure Storage"
+                exit 1
+              }
               
-              # Cleanup old backups (30 days)
-              az storage blob delete-batch \
-                --source n8n-backups \
-                --pattern "n8n-backup-$(date -d '30 days ago' +%Y%m%d)*" \
-                --account-name your-storage-account
+              echo "Backup uploaded successfully"
+              
+              # Cleanup old backups
+              echo "Cleaning up old backups (older than $RETENTION_DAYS days)..."
+              CUTOFF_DATE=$(date -d "$RETENTION_DAYS days ago" +%Y%m%d)
+              
+              # List and delete old backups
+              az storage blob list \
+                --container-name n8n-backups \
+                --prefix "n8n-backup-" \
+                --query "[?properties.creationTime < '$CUTOFF_DATE'].name" \
+                --output tsv \
+                --account-name "${AZURE_STORAGE_ACCOUNT}" \
+                --auth-mode login | \
+              while read -r blob_name; do
+                if [ -n "$blob_name" ]; then
+                  echo "Deleting old backup: $blob_name"
+                  az storage blob delete \
+                    --name "$blob_name" \
+                    --container-name n8n-backups \
+                    --account-name "${AZURE_STORAGE_ACCOUNT}" \
+                    --auth-mode login
+                fi
+              done
+              
+              # Cleanup local files
+              rm -rf "$BACKUP_DIR" "$BACKUP_FILE"
+              
+              echo "Backup completed successfully at $(date)"
+              
+            env:
+            - name: AZURE_STORAGE_ACCOUNT
+              value: "your-storage-account"
             volumeMounts:
             - name: n8n-data
               mountPath: /n8n-data
               readOnly: true
-            - name: backup-storage
-              mountPath: /backup
           volumes:
           - name: n8n-data
             persistentVolumeClaim:
               claimName: n8n-data
-          - name: backup-storage
-            emptyDir: {}
           restartPolicy: OnFailure

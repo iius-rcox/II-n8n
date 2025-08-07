@@ -12,9 +12,7 @@ spec:
   - Egress
   ingress:
   - from:
-    - namespaceSelector:
-        matchLabels:
-          name: ingress-nginx
+    - namespaceSelector: {}  # Allow from any namespace
     ports:
     - protocol: TCP
       port: 5678

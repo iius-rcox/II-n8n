@@ -5,7 +5,7 @@ namespace: n8n-prod
 
 resources:
   - namespace.yaml
-  - storage/
+  - storage/pvc.yaml
   - rbac/
   - secrets/
   - network/

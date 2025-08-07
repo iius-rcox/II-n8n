@@ -1,0 +1,23 @@
+# Sensitive files
+k8s/secrets/n8n-secrets.yaml
+*.key
+*.pem
+*.crt
+
+# Backup files
+n8n-values-backup-*.yaml
+backup-*.tar.gz
+
+# Temporary files
+*.tmp
+*.log
+.DS_Store
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db

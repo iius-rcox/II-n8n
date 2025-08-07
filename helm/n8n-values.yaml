@@ -1,0 +1,90 @@
+replicaCount: 1
+
+image:
+  repository: n8nio/n8n
+  tag: latest
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 5678
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: n8n.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: n8n-tls
+      hosts:
+        - n8n.yourdomain.com
+
+persistence:
+  enabled: true
+  existingClaim: n8n-data
+  mountPath: /home/node/.n8n
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+env:
+  N8N_HOST: "n8n.yourdomain.com"
+  N8N_PORT: "5678"
+  N8N_PROTOCOL: "https"
+  WEBHOOK_URL: "https://n8n.yourdomain.com"
+  GENERIC_TIMEZONE: "America/New_York"
+  N8N_LOG_LEVEL: "info"
+  N8N_USER_MANAGEMENT_DISABLED: "false"
+  N8N_SECURE_COOKIE: "true"
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 5678
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: 5678
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+nodeSelector:
+  kubernetes.io/os: linux
+
+tolerations: []
+
+affinity: {}
+
+# Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Pod Security Context
+podSecurityContext:
+  fsGroup: 1000
+
+# Service Account
+serviceAccount:
+  create: false
+  name: n8n

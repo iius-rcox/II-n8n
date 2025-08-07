@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: n8n-backup
+  namespace: n8n-prod
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: mcr.microsoft.com/azure-cli:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              # Create backup directory
+              BACKUP_DATE=$(date +%Y%m%d-%H%M%S)
+              BACKUP_DIR="/backup/n8n-$BACKUP_DATE"
+              
+              # Copy n8n data
+              cp -r /n8n-data/* $BACKUP_DIR/
+              
+              # Compress and upload to Azure Storage
+              tar -czf /tmp/n8n-backup-$BACKUP_DATE.tar.gz -C /backup n8n-$BACKUP_DATE
+              
+              # Upload to Azure Blob Storage (configure with managed identity)
+              az storage blob upload \
+                --file /tmp/n8n-backup-$BACKUP_DATE.tar.gz \
+                --container-name n8n-backups \
+                --name n8n-backup-$BACKUP_DATE.tar.gz \
+                --account-name your-storage-account
+              
+              # Cleanup old backups (30 days)
+              az storage blob delete-batch \
+                --source n8n-backups \
+                --pattern "n8n-backup-$(date -d '30 days ago' +%Y%m%d)*" \
+                --account-name your-storage-account
+            volumeMounts:
+            - name: n8n-data
+              mountPath: /n8n-data
+              readOnly: true
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: n8n-data
+            persistentVolumeClaim:
+              claimName: n8n-data
+          - name: backup-storage
+            emptyDir: {}
+          restartPolicy: OnFailure

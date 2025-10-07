@@ -6,6 +6,10 @@ metadata:
   labels:
     app: n8n
     environment: production
+  annotations:
+    keel.sh/policy: minor              # Only update minor versions (1.x.x → 1.y.x)
+    keel.sh/trigger: poll              # Poll Docker Hub for updates
+    keel.sh/pollSchedule: "@every 12h" # Check twice daily
 spec:
   replicas: 1
   selector:
@@ -24,19 +28,20 @@ spec:
         fsGroup: 1000
       containers:
       - name: n8n
-        image: n8nio/n8n:latest
+        image: n8nio/n8n:1.67.0         # Specific version for Keel tracking
+        imagePullPolicy: Always          # Required for Keel to work properly
         ports:
         - containerPort: 5678
           name: http
         env:
         - name: N8N_HOST
-          value: "n8n.yourdomain.com"
+          value: "n8n.ii-us.com"
         - name: N8N_PORT
           value: "5678"
         - name: N8N_PROTOCOL
           value: "https"
         - name: WEBHOOK_URL
-          value: "https://n8n.yourdomain.com"
+          value: "https://n8n.ii-us.com"
         - name: GENERIC_TIMEZONE
           value: "America/New_York"
         - name: N8N_LOG_LEVEL

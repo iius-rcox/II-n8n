@@ -13,13 +13,13 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
 spec:
-  ingressClassName: nginx
+  ingressClassName: webapprouting.kubernetes.azure.com
   tls:
   - hosts:
-    - n8n.yourdomain.com
+    - n8n.ii-us.com
     secretName: n8n-tls
   rules:
-  - host: n8n.yourdomain.com
+  - host: n8n.ii-us.com
     http:
       paths:
       - path: /

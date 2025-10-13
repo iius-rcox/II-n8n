@@ -24,19 +24,19 @@ spec:
         fsGroup: 1000
       containers:
       - name: n8n
-        image: n8nio/n8n:latest
+        image: n8nio/n8n:1.115.2
         ports:
         - containerPort: 5678
           name: http
         env:
         - name: N8N_HOST
-          value: "n8n.yourdomain.com"
+          value: "n8n.ii-us.com"
         - name: N8N_PORT
           value: "5678"
         - name: N8N_PROTOCOL
           value: "https"
         - name: WEBHOOK_URL
-          value: "https://n8n.yourdomain.com"
+          value: "https://n8n.ii-us.com"
         - name: GENERIC_TIMEZONE
           value: "America/New_York"
         - name: N8N_LOG_LEVEL

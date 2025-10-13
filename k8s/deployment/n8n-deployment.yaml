@@ -6,6 +6,10 @@ metadata:
   labels:
     app: n8n
     environment: production
+  annotations:
+    keel.sh/policy: minor              # Only update minor versions (1.x.x → 1.y.x)
+    keel.sh/trigger: poll              # Poll Docker Hub for updates
+    keel.sh/pollSchedule: "@every 12h" # Check twice daily
 spec:
   replicas: 1
   selector:
@@ -24,7 +28,8 @@ spec:
         fsGroup: 1000
       containers:
       - name: n8n
-        image: n8nio/n8n:1.115.2
+        image: n8nio/n8n:1.115.2        # Updated to latest version
+        imagePullPolicy: Always          # Required for Keel to work properly
         ports:
         - containerPort: 5678
           name: http

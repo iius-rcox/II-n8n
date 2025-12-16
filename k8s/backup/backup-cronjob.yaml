@@ -140,7 +140,7 @@ spec:
             #     name: backup-secrets
             #     key: AZURE_STORAGE_ACCOUNT
             - name: AZURE_STORAGE_ACCOUNT
-              value: "YOUR_STORAGE_ACCOUNT_NAME"
+              value: "n8nbackups9679"
             volumeMounts:
             - name: n8n-data
               mountPath: /n8n-data

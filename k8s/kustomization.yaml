@@ -17,9 +17,11 @@ resources:
   - deployment/hpa.yaml
   - backup/backup-cronjob.yaml
 
-commonLabels:
-  app: n8n
-  environment: production
+labels:
+  - pairs:
+      app: n8n
+      environment: production
+    includeSelectors: false
 
 # Image configuration for ArgoCD Image Updater
 images:

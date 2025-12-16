@@ -1,29 +1,25 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
 namespace: n8n-prod
-
 resources:
-  - namespace.yaml
-  - storage/pvc.yaml
-  - rbac/service-account.yaml
-  - rbac/backup-service-account.yaml
-  # Note: n8n-secrets excluded - must be created manually in cluster
-  - network/network-policy.yaml
-  - deployment/n8n-deployment.yaml
-  - deployment/n8n-service.yaml
-  - deployment/n8n-ingress.yaml
-  - deployment/pdb.yaml
-  - deployment/hpa.yaml
-  - backup/backup-cronjob.yaml
-
+- namespace.yaml
+- storage/pvc.yaml
+- rbac/service-account.yaml
+- rbac/backup-service-account.yaml
+# Note: n8n-secrets excluded - must be created manually in cluster
+- network/network-policy.yaml
+- deployment/n8n-deployment.yaml
+- deployment/n8n-service.yaml
+- deployment/n8n-ingress.yaml
+- deployment/pdb.yaml
+- deployment/hpa.yaml
+- backup/backup-cronjob.yaml
 labels:
-  - pairs:
-      app: n8n
-      environment: production
-    includeSelectors: false
-
+- pairs:
+    app: n8n
+    environment: production
+  includeSelectors: false
 # Image configuration for ArgoCD Image Updater
 images:
-  - name: n8nio/n8n
-    newTag: "1.72"
+- name: n8nio/n8n
+  newTag: 1.123.6

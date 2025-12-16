@@ -1,8 +1,12 @@
-# Sensitive files
+# Sensitive files - NEVER commit secrets
 k8s/secrets/n8n-secrets.yaml
 *.key
 *.pem
 *.crt
+*.env
+*.env.*
+kubeconfig*
+.kube/
 
 # Backup files
 n8n-values-backup-*.yaml

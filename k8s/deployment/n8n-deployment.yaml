@@ -6,12 +6,19 @@ metadata:
   labels:
     app: n8n
     environment: production
-  annotations:
-    keel.sh/policy: minor              # Only update minor versions (1.x.x → 1.y.x)
-    keel.sh/trigger: poll              # Poll Docker Hub for updates
-    keel.sh/pollSchedule: "@every 12h" # Check twice daily
+    app.kubernetes.io/name: n8n
+    app.kubernetes.io/instance: n8n-prod
+    app.kubernetes.io/version: "1.72"
+    app.kubernetes.io/component: workflow-automation
+  # NOTE: Using ArgoCD Image Updater for automatic updates (configured in gitops/argo-application.yaml)
+  # Removed Keel annotations to avoid conflicts - choose ONE update mechanism
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: n8n
@@ -20,19 +27,31 @@ spec:
       labels:
         app: n8n
         environment: production
+        app.kubernetes.io/name: n8n
     spec:
       serviceAccountName: n8n
+      terminationGracePeriodSeconds: 60
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: n8n
-        image: n8nio/n8n:1.115.2        # Updated to latest version
-        imagePullPolicy: Always          # Required for Keel to work properly
+        # Using semver constraint for ArgoCD Image Updater - allows 1.x updates
+        image: n8nio/n8n:1.72
+        imagePullPolicy: Always
         ports:
         - containerPort: 5678
           name: http
+          protocol: TCP
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+              - ALL
         env:
         - name: N8N_HOST
           value: "n8n.ii-us.com"
@@ -55,13 +74,25 @@ spec:
             secretKeyRef:
               name: n8n-secrets
               key: N8N_ENCRYPTION_KEY
+        # Performance tuning
+        - name: N8N_PAYLOAD_SIZE_MAX
+          value: "64"
+        - name: EXECUTIONS_DATA_PRUNE
+          value: "true"
+        - name: EXECUTIONS_DATA_MAX_AGE
+          value: "168"
+        - name: N8N_METRICS
+          value: "true"
+        - name: N8N_METRICS_PREFIX
+          value: "n8n_"
+        # Increased resources for production workloads
         resources:
           requests:
-            cpu: 100m
-            memory: 256Mi
-          limits:
-            cpu: 200m
+            cpu: 500m
             memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
         livenessProbe:
           httpGet:
             path: /healthz

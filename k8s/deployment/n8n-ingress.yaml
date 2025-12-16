@@ -6,12 +6,32 @@ metadata:
   labels:
     app: n8n
     environment: production
+    app.kubernetes.io/name: n8n
+    app.kubernetes.io/instance: n8n-prod
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Azure Web App Routing annotations (matches ingressClassName)
+    kubernetes.azure.com/tls-cert-keyvault-uri: ""  # Optional: Use Azure Key Vault for TLS
+    # Cert-manager for automatic TLS certificate management
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    # Timeouts for long-running workflow webhooks
+    nginx.ingress.kubernetes.io/proxy-body-size: "64m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    # WebSocket support for n8n UI
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"
+    # Security headers
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+    # Rate limiting (optional - adjust as needed)
+    nginx.ingress.kubernetes.io/limit-rps: "50"
+    nginx.ingress.kubernetes.io/limit-connections: "25"
 spec:
   ingressClassName: webapprouting.kubernetes.azure.com
   tls:

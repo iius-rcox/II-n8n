@@ -3,6 +3,9 @@ kind: NetworkPolicy
 metadata:
   name: n8n-network-policy
   namespace: n8n-prod
+  labels:
+    app: n8n
+    environment: production
 spec:
   podSelector:
     matchLabels:
@@ -11,10 +14,60 @@ spec:
   - Ingress
   - Egress
   ingress:
+  # Allow traffic from ingress controller
   - from:
-    - namespaceSelector: {}  # Allow from any namespace
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: app-routing-system
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 5678
+  # Allow traffic from monitoring namespace (for metrics scraping)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
     ports:
     - protocol: TCP
       port: 5678
   egress:
-  - {}  # Allow all outbound traffic for SQL Server access
+  # Allow DNS resolution
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow HTTPS for webhooks and external API calls
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+  # Allow SQL Server connections (Azure SQL)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 1433
+  # Allow SMTP for email notifications
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 587
+    - protocol: TCP
+      port: 465

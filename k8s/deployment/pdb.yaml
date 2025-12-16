@@ -1,0 +1,15 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: n8n-pdb
+  namespace: n8n-prod
+  labels:
+    app: n8n
+    environment: production
+spec:
+  # Ensure at least one pod is available during voluntary disruptions
+  # (node drains, cluster upgrades, etc.)
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: n8n

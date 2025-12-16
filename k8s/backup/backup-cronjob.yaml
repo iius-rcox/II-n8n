@@ -3,13 +3,27 @@ kind: CronJob
 metadata:
   name: n8n-backup
   namespace: n8n-prod
+  labels:
+    app: n8n
+    component: backup
+    environment: production
 spec:
-  schedule: "0 2 * * *"  # Daily at 2 AM
+  schedule: "0 2 * * *"  # Daily at 2 AM UTC
+  timeZone: "America/New_York"  # Kubernetes 1.27+
+  concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 5
+  startingDeadlineSeconds: 3600  # Skip if missed by more than 1 hour
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 86400  # Clean up completed jobs after 24 hours
+      activeDeadlineSeconds: 1800     # Timeout job after 30 minutes
+      backoffLimit: 3
       template:
+        metadata:
+          labels:
+            app: n8n
+            component: backup
         spec:
           serviceAccountName: n8n-backup
           containers:
@@ -119,8 +133,14 @@ spec:
               echo "Backup completed successfully at $(date)"
               
             env:
+            # TODO: Update with your actual Azure Storage Account name
+            # Or use a secret reference:
+            # valueFrom:
+            #   secretKeyRef:
+            #     name: backup-secrets
+            #     key: AZURE_STORAGE_ACCOUNT
             - name: AZURE_STORAGE_ACCOUNT
-              value: "your-storage-account"
+              value: "YOUR_STORAGE_ACCOUNT_NAME"
             volumeMounts:
             - name: n8n-data
               mountPath: /n8n-data

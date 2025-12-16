@@ -1,19 +1,41 @@
 # gitops/argo-application.yaml
+# =============================================================================
+# ArgoCD Application for n8n Workflow Automation
+# =============================================================================
+# PREREQUISITES:
+# 1. Install ArgoCD Image Updater:
+#    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/stable/manifests/install.yaml
+# 2. Create git credentials secret for write-back (see argocd-repo-secret.yaml)
+# 3. Update repoURL below with your actual repository URL
+# =============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: n8n-prod
   namespace: argocd
+  labels:
+    app.kubernetes.io/name: n8n
+    app.kubernetes.io/instance: n8n-prod
+    environment: production
   annotations:
-    argocd-image-updater.argoproj.io/image-list: n8n=n8nio/n8n
-    argocd-image-updater.argoproj.io/n8n.update-strategy: latest
-    argocd-image-updater.argoproj.io/n8n.pull-secret: pullsecret:argocd/pull-secret
+    # ArgoCD Image Updater Configuration
+    # Automatically updates n8n to latest version matching semver constraint
+    argocd-image-updater.argoproj.io/image-list: n8n=n8nio/n8n:~1
+    argocd-image-updater.argoproj.io/n8n.update-strategy: semver
+    argocd-image-updater.argoproj.io/n8n.allow-tags: regexp:^1\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/n8n.ignore-tags: latest,edge,nightly,dev,alpha,beta
     argocd-image-updater.argoproj.io/write-back-method: git
+    argocd-image-updater.argoproj.io/write-back-target: kustomization
+    argocd-image-updater.argoproj.io/git-branch: main
+    # Notifications (optional - configure argocd-notifications)
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: n8n-deployments
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
-    repoURL: 'https://your-git-repo.com/k8s-configs'
-    path: n8n/prod
+    repoURL: 'https://github.com/iius-rcox/II-n8n.git'
+    path: k8s
     targetRevision: main
   destination:
     server: 'https://kubernetes.default.svc'
@@ -22,5 +44,16 @@ spec:
     automated:
       prune: true
       selfHeal: true
+      allowEmpty: false
     syncOptions:
       - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 10

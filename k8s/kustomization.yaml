@@ -6,11 +6,22 @@ namespace: n8n-prod
 resources:
   - namespace.yaml
   - storage/pvc.yaml
-  - rbac/
-  - secrets/
-  - network/
-  - backup/
+  - rbac/service-account.yaml
+  - rbac/backup-service-account.yaml
+  - secrets/n8n-secrets.yaml
+  - network/network-policy.yaml
+  - deployment/n8n-deployment.yaml
+  - deployment/n8n-service.yaml
+  - deployment/n8n-ingress.yaml
+  - deployment/pdb.yaml
+  - deployment/hpa.yaml
+  - backup/backup-cronjob.yaml
 
 commonLabels:
   app: n8n
   environment: production
+
+# Image configuration for ArgoCD Image Updater
+images:
+  - name: n8nio/n8n
+    newTag: "1.72"

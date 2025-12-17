@@ -1,0 +1,34 @@
+# argocd/argocd-cm.yaml
+# =============================================================================
+# ArgoCD Main ConfigMap
+# =============================================================================
+# This ConfigMap controls ArgoCD application settings including the external URL,
+# admin user configuration, and optional SSO settings.
+#
+# IMPORTANT: This is a PATCH - it will merge with the existing ConfigMap.
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+    app.kubernetes.io/component: server
+data:
+  # External URL for ArgoCD - used for generating links in notifications and UI
+  url: https://k8.ii-us.com
+
+  # Enable the admin user (can be disabled after setting up SSO)
+  admin.enabled: "true"
+
+  # Enable status badge for applications (optional)
+  statusbadge.enabled: "true"
+
+  # Timeout for application reconciliation (optional)
+  timeout.reconciliation: "180s"
+
+  # Resource tracking method - annotation is default and recommended
+  # Options: annotation, label, annotation+label
+  application.resourceTrackingMethod: "annotation"

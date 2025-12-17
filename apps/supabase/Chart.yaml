@@ -1,0 +1,10 @@
+apiVersion: v2
+name: supabase
+description: Supabase deployment for ExpenseFlow
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  - name: supabase
+    version: "0.1.3"
+    repository: "https://supabase-community.github.io/supabase-kubernetes"

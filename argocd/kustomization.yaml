@@ -1,0 +1,49 @@
+# argocd/kustomization.yaml
+# =============================================================================
+# Kustomization for ArgoCD UI Configuration
+# =============================================================================
+# This kustomization manages ArgoCD server configuration overlays.
+# It patches the existing ArgoCD installation with custom settings
+# for external access, TLS, and authentication.
+#
+# PREREQUISITES:
+# 1. ArgoCD installed in the argocd namespace (via Helm or manifests)
+# 2. cert-manager configured with letsencrypt-prod ClusterIssuer
+# 3. External Secrets Operator installed
+#
+# USAGE:
+# Apply these overlays to your existing ArgoCD installation:
+#   kubectl apply -k argocd/
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+
+resources:
+  # ArgoCD Ingress for external access with TLS
+  - ingress.yaml
+  # RBAC configuration (optional - can also patch existing)
+  - argocd-rbac-cm.yaml
+
+# ConfigMap patches - merge with existing ArgoCD ConfigMaps
+configMapGenerator:
+  # Server command parameters (insecure mode for TLS termination at ingress)
+  - name: argocd-cmd-params-cm
+    behavior: merge
+    files:
+      - argocd-cmd-params-cm.yaml
+  # Main ArgoCD configuration (URL, admin settings)
+  - name: argocd-cm
+    behavior: merge
+    files:
+      - argocd-cm.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: kustomize
+      app.kubernetes.io/part-of: argocd-custom-config
+    includeSelectors: false

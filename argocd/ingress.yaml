@@ -1,0 +1,69 @@
+# argocd/ingress.yaml
+# =============================================================================
+# ArgoCD Server Ingress with TLS
+# =============================================================================
+# Exposes ArgoCD web UI externally with automatic TLS certificate management
+# via cert-manager and Let's Encrypt.
+#
+# PREREQUISITES:
+# 1. ArgoCD server configured with server.insecure=true (argocd-cmd-params-cm.yaml)
+# 2. cert-manager installed with letsencrypt-prod ClusterIssuer
+# 3. DNS record configured for k8.ii-us.com
+# 4. Azure Web App Routing ingress controller enabled on AKS
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-server
+    app.kubernetes.io/part-of: argocd
+    app.kubernetes.io/component: server
+  annotations:
+    # cert-manager for automatic TLS certificate management
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+    # Backend protocol - ArgoCD server runs in insecure mode (HTTP)
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+
+    # Force HTTPS redirect
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+
+    # Session affinity for UI consistency
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "argocd-affinity"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "3600"
+
+    # Timeouts for long-running operations (sync, diff)
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+
+    # Increase body size for large manifests
+    nginx.ingress.kubernetes.io/proxy-body-size: "64m"
+spec:
+  ingressClassName: webapprouting.kubernetes.azure.com
+  tls:
+    - hosts:
+        - k8.ii-us.com
+      secretName: argocd-tls
+  rules:
+    - host: k8.ii-us.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80

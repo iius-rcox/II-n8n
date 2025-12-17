@@ -1,0 +1,30 @@
+# argocd/argocd-cmd-params-cm.yaml
+# =============================================================================
+# ArgoCD Server Command Parameters ConfigMap
+# =============================================================================
+# This ConfigMap controls ArgoCD server runtime parameters.
+# Setting server.insecure=true disables TLS on the server, allowing
+# TLS termination at the ingress layer (recommended for Azure Web App Routing).
+#
+# IMPORTANT: This is a PATCH - it will merge with the existing ConfigMap.
+# Apply with: kubectl patch configmap argocd-cmd-params-cm -n argocd --patch-file argocd-cmd-params-cm.yaml
+# Or apply directly and restart argocd-server deployment.
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cmd-params-cm
+    app.kubernetes.io/part-of: argocd
+    app.kubernetes.io/component: server
+data:
+  # Run server without TLS - TLS is terminated at the ingress
+  server.insecure: "true"
+
+  # Optional: Set log level for troubleshooting
+  server.log.level: "info"
+
+  # Optional: Set log format (text or json)
+  server.log.format: "text"

@@ -1,0 +1,144 @@
+# Supabase values for ExpenseFlow
+# NOTE: Secrets should ideally be managed via ExternalSecrets
+# This is maintained for parity with existing deployment
+
+supabase:
+  # Database
+  db:
+    enabled: true
+    image:
+      repository: supabase/postgres
+      tag: 15.8.1.085
+      pullPolicy: IfNotPresent
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClassName: managed-csi-premium
+      accessModes:
+        - ReadWriteOnce
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  # Kong API Gateway
+  kong:
+    enabled: true
+    image:
+      repository: kong
+      tag: 2.8.1
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # PostgREST
+  rest:
+    enabled: true
+    image:
+      repository: postgrest/postgrest
+      tag: v13.0.7
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  # Realtime
+  realtime:
+    enabled: true
+    image:
+      repository: supabase/realtime
+      tag: v2.33.70
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    environment:
+      APP_NAME: realtime
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+      DB_ENC_KEY: supabaserealtime
+      DB_PORT: "5432"
+      DB_SSL: "false"
+      DB_USER: supabase_admin
+      DNS_NODES: ""
+      ENABLE_TAILSCALE: "false"
+      ERL_AFLAGS: "-proto_dist inet_tcp"
+      FLY_ALLOC_ID: fly123
+      FLY_APP_NAME: realtime
+      PORT: "4000"
+      SECRET_KEY_BASE: UpNVntn3cDxHJpq99YMc1T1AQgQpc8kfYTuRgBiYa15BLrx8etQoXz3gZv1/u2oq
+
+  # Postgres Meta
+  meta:
+    enabled: true
+    image:
+      repository: supabase/postgres-meta
+      tag: v0.93.1
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  # Studio (Dashboard)
+  studio:
+    enabled: true
+    image:
+      repository: supabase/studio
+      tag: 2025.11.26-sha-8f096b5
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # Disabled components
+  auth:
+    enabled: false
+  storage:
+    enabled: false
+  functions:
+    enabled: false
+  analytics:
+    enabled: false
+  vector:
+    enabled: false
+  imgproxy:
+    enabled: false
+  minio:
+    enabled: false
+
+  # Secrets - TODO: Move to ExternalSecrets
+  secret:
+    dashboard:
+      username: admin
+      password: b0c163e637ecbad1
+    db:
+      username: postgres
+      password: 0522f6633df254e6afe49f3eee40e3e1
+      database: postgres
+    jwt:
+      secret: 48d03da7317b97019dcb466e521e676a6928212d63fa55ff3428f48978d601c4
+      anonKey: 72b670006b7007cc4fdf4f8936aa3a8ac918eaafd13c39055fe4ca8da2f540f2
+      serviceKey: adfacbc27278f91596927d1bfb70c1b59b1929b5fdcb590649672eaa5bbe27b6

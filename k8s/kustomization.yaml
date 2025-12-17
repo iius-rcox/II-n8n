@@ -6,7 +6,8 @@ resources:
 - storage/pvc.yaml
 - rbac/service-account.yaml
 - rbac/backup-service-account.yaml
-# Note: n8n-secrets excluded - must be created manually in cluster
+# External Secrets - syncs n8n-secrets from Azure Key Vault
+- secrets/external-secrets/n8n-external-secret.yaml
 - network/network-policy.yaml
 - deployment/n8n-deployment.yaml
 - deployment/n8n-service.yaml

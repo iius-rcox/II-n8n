@@ -1,0 +1,51 @@
+# ArgoCD Server Ingress Contract Definition
+# Exposes ArgoCD web UI with TLS via Azure Web App Routing
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-server
+    app.kubernetes.io/part-of: argocd
+    app.kubernetes.io/component: server
+  annotations:
+    # cert-manager for automatic TLS certificate management
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+    # Backend protocol - ArgoCD server runs in insecure mode
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+
+    # Force HTTPS redirect
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+
+    # Session affinity for UI consistency
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "argocd-affinity"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "3600"
+spec:
+  ingressClassName: webapprouting.kubernetes.azure.com
+  tls:
+    - hosts:
+        - argocd.ii-us.com
+      secretName: argocd-tls
+  rules:
+    - host: argocd.ii-us.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80

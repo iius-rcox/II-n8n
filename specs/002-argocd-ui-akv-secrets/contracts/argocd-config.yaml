@@ -1,0 +1,86 @@
+# ArgoCD Server Configuration Contract Definitions
+# ConfigMaps for ArgoCD server settings
+
+---
+# Main ArgoCD configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # External URL for ArgoCD UI
+  url: https://argocd.ii-us.com
+
+  # Enable admin user (can be disabled after creating additional users)
+  admin.enabled: "true"
+
+  # Status badge enabled for public status checks
+  statusbadge.enabled: "true"
+
+  # Application namespace restriction (optional - remove for cluster-wide)
+  # application.resourceTrackingMethod: annotation
+
+---
+# ArgoCD server command parameters
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cmd-params-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Run server without TLS (TLS terminated at ingress)
+  server.insecure: "true"
+
+  # Disable client-side TLS cert verification for API calls
+  server.disable.auth: "false"
+
+  # Log level
+  server.log.level: "info"
+
+---
+# ArgoCD RBAC configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-rbac-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Default policy for authenticated users
+  policy.default: role:readonly
+
+  # RBAC policy rules (CSV format)
+  # Format: p, <subject>, <resource>, <action>, <project>/<object>, allow/deny
+  policy.csv: |
+    # Admin has full access
+    p, role:admin, applications, *, */*, allow
+    p, role:admin, clusters, *, *, allow
+    p, role:admin, repositories, *, *, allow
+    p, role:admin, projects, *, *, allow
+    p, role:admin, accounts, *, *, allow
+    p, role:admin, certificates, *, *, allow
+    p, role:admin, gpgkeys, *, *, allow
+    p, role:admin, logs, *, */*, allow
+    p, role:admin, exec, *, */*, allow
+
+    # Readonly role (default)
+    p, role:readonly, applications, get, */*, allow
+    p, role:readonly, clusters, get, *, allow
+    p, role:readonly, repositories, get, *, allow
+    p, role:readonly, projects, get, *, allow
+    p, role:readonly, logs, get, */*, allow
+
+    # Assign admin role to admin user
+    g, admin, role:admin
+
+  # Scopes for OIDC (if enabled later)
+  scopes: "[groups, email]"

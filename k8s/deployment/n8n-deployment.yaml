@@ -15,10 +15,8 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+    # Recreate strategy required for ReadWriteOnce PVC - can't attach to multiple pods
+    type: Recreate
   selector:
     matchLabels:
       app: n8n

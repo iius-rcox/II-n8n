@@ -11,4 +11,4 @@ resources:
 
   # Applications
   - n8n.yaml
-  - supabase.yaml
+  # - supabase.yaml  # TODO: Helm repo unavailable, Supabase managed manually for now

@@ -5,7 +5,7 @@ resources:
   # Infrastructure
   - cert-manager.yaml
   - external-secrets.yaml
-  - monitoring.yaml
+  # - monitoring.yaml  # TODO: Insufficient cluster capacity, enable when resources available
   - keel.yaml
   - argocd.yaml
 

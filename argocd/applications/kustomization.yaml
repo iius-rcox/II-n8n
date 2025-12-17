@@ -3,12 +3,12 @@ kind: Kustomization
 
 resources:
   # Infrastructure
-  - ../../infrastructure/cert-manager/application.yaml
-  - ../../infrastructure/external-secrets/application.yaml
-  - ../../infrastructure/monitoring/application.yaml
-  - ../../infrastructure/keel/application.yaml
-  - ../../infrastructure/argocd/application.yaml
+  - cert-manager.yaml
+  - external-secrets.yaml
+  - monitoring.yaml
+  - keel.yaml
+  - argocd.yaml
 
   # Applications
-  - ../../apps/n8n/application.yaml
-  - ../../apps/supabase/application.yaml
+  - n8n.yaml
+  - supabase.yaml

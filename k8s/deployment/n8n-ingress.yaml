@@ -29,9 +29,9 @@ metadata:
       more_set_headers "X-Content-Type-Options: nosniff";
       more_set_headers "X-XSS-Protection: 1; mode=block";
       more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
-    # Rate limiting (optional - adjust as needed)
-    nginx.ingress.kubernetes.io/limit-rps: "50"
-    nginx.ingress.kubernetes.io/limit-connections: "25"
+    # Rate limiting disabled - n8n loads 150+ assets on page load
+    # nginx.ingress.kubernetes.io/limit-rps: "50"
+    # nginx.ingress.kubernetes.io/limit-connections: "25"
 spec:
   ingressClassName: webapprouting.kubernetes.azure.com
   tls:

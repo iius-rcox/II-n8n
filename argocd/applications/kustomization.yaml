@@ -11,4 +11,5 @@ resources:
 
   # Applications
   - n8n.yaml
+  - expenseflow-staging.yaml
   # - supabase.yaml  # TODO: Helm repo unavailable, Supabase managed manually for now

@@ -88,7 +88,7 @@ supabase:
     enabled: true
     image:
       repository: supabase/postgres-meta
-      tag: v0.93.1
+      tag: v0.95.2
       pullPolicy: IfNotPresent
     resources:
       requests:

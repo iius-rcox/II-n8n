@@ -8,7 +8,7 @@ supabase:
     enabled: true
     image:
       repository: supabase/postgres
-      tag: 15.8.1.085
+      tag: 15.14.1.072
       pullPolicy: IfNotPresent
     persistence:
       enabled: true

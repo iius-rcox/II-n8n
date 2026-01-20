@@ -29,7 +29,7 @@ supabase:
     enabled: true
     image:
       repository: kong
-      tag: 2.8.1
+      tag: 2.8.5
       pullPolicy: IfNotPresent
     resources:
       requests:

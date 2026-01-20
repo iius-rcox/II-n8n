@@ -1,6 +1,32 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ]
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends":
+    [
+        "config:recommended",
+        "schedule:weekly"
+    ],
+    "automerge": true,
+    "automergeType": "pr",
+    "platformAutomerge": true,
+    "packageRules":
+    [
+        {
+            "matchPackageNames":
+            [
+                "n8nio/n8n"
+            ],
+            "matchUpdateTypes":
+            [
+                "major",
+                "minor",
+                "patch"
+            ],
+            "enabled": true,
+            "automerge": true,
+            "schedule":
+            [
+                "after 10pm on sunday"
+            ]
+        }
+    ]
 }

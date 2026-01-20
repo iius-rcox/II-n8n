@@ -23,4 +23,4 @@ labels:
 # Image configuration for ArgoCD Image Updater
 images:
 - name: n8nio/n8n
-  newTag: 1.123.6
+  newTag: 1.123.16

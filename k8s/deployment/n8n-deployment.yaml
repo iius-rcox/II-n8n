@@ -89,6 +89,9 @@ spec:
           value: "true"
         - name: N8N_METRICS_PREFIX
           value: "n8n_"
+        # Allow Code nodes to access these env vars via $env()
+        - name: N8N_EXTERNAL_ALLOWED_VARIABLES
+          value: "AZURE_STORAGE_SAS_TOKEN,TEAMS_WEBHOOK_URL,MS_GRAPH_CLIENT_SECRET"
         # Increased resources for production workloads
         resources:
           requests:

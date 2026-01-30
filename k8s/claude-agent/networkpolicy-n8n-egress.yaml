@@ -1,0 +1,34 @@
+# Allow n8n to reach claude-agent service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-n8n-to-claude-agent
+  namespace: n8n-prod
+  labels:
+    app: n8n
+spec:
+  podSelector:
+    matchLabels:
+      app: n8n
+  policyTypes:
+  - Egress
+  egress:
+  # Allow traffic to claude-agent pods on port 3000 (container port)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: claude-agent
+      podSelector:
+        matchLabels:
+          app: claude-code-agent
+    ports:
+    - protocol: TCP
+      port: 3000
+  # Allow traffic to claude-agent service on port 80
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: claude-agent
+    ports:
+    - protocol: TCP
+      port: 80

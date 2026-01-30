@@ -1,0 +1,31 @@
+# RBAC to allow n8n to execute commands in claude-agent pods
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: n8n-agent-executor
+  namespace: claude-agent
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods/exec"]
+  verbs: ["create"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: n8n-agent-executor
+  namespace: claude-agent
+subjects:
+# n8n service account in n8n-prod namespace
+- kind: ServiceAccount
+  name: n8n
+  namespace: n8n-prod
+roleRef:
+  kind: Role
+  name: n8n-agent-executor
+  apiGroup: rbac.authorization.k8s.io

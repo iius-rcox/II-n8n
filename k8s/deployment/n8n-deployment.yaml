@@ -72,6 +72,12 @@ spec:
             secretKeyRef:
               name: n8n-secrets
               key: N8N_ENCRYPTION_KEY
+        # MS Graph client secret for employee termination workflow
+        - name: MS_GRAPH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: n8n-termination-secrets
+              key: MS_GRAPH_CLIENT_SECRET
         # Performance tuning
         - name: N8N_PAYLOAD_SIZE_MAX
           value: "64"

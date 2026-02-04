@@ -72,6 +72,12 @@ spec:
             secretKeyRef:
               name: n8n-secrets
               key: N8N_ENCRYPTION_KEY
+        # MS Graph client secret for employee termination workflow
+        - name: MS_GRAPH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: n8n-termination-secrets
+              key: MS_GRAPH_CLIENT_SECRET
         # Performance tuning
         - name: N8N_PAYLOAD_SIZE_MAX
           value: "64"
@@ -83,6 +89,9 @@ spec:
           value: "true"
         - name: N8N_METRICS_PREFIX
           value: "n8n_"
+        # Allow Code nodes to access these env vars via $env()
+        - name: N8N_EXTERNAL_ALLOWED_VARIABLES
+          value: "AZURE_STORAGE_SAS_TOKEN,TEAMS_WEBHOOK_URL,MS_GRAPH_CLIENT_SECRET"
         # Increased resources for production workloads
         resources:
           requests:

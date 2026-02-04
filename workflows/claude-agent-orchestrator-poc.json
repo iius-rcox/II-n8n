@@ -1,0 +1,406 @@
+{
+  "name": "Claude Agent Orchestrator POC",
+  "nodes": [
+    {
+      "id": "webhook-trigger",
+      "name": "Agent Run Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "agent-run-webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agent-run",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "set-params",
+      "name": "Set Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 300],
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ticket_id",
+              "name": "ticket_id",
+              "value": "={{ $json.body.ticket_id || 'TEST-001' }}",
+              "type": "string"
+            },
+            {
+              "id": "phase",
+              "name": "phase",
+              "value": "={{ $json.body.phase || 'intake' }}",
+              "type": "string"
+            },
+            {
+              "id": "agent_name",
+              "name": "agent_name",
+              "value": "={{ $json.body.agent_name || 'pm' }}",
+              "type": "string"
+            },
+            {
+              "id": "container",
+              "name": "container",
+              "value": "={{ $json.body.container || 'agent-spec' }}",
+              "type": "string"
+            },
+            {
+              "id": "timeout",
+              "name": "timeout",
+              "value": "={{ $json.body.timeout || 3600 }}",
+              "type": "number"
+            },
+            {
+              "id": "retry_count",
+              "name": "retry_count",
+              "value": "={{ $json.body.retry_count || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "max_retries",
+              "name": "max_retries",
+              "value": 3,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "run-agent",
+      "name": "Run Claude Agent",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [440, 300],
+      "parameters": {
+        "command": "=kubectl exec -n claude-agent deploy/claude-code-agent -- /home/claude-agent/scripts/run-agent.sh \"{{ $json.ticket_id }}\" \"{{ $json.agent_name }}\" \"{{ $json.phase }}\" \"{{ $json.container }}\" \"{{ $json.timeout }}\"; echo \"EXIT_CODE=$?\""
+      },
+      "notes": "Executes kubectl directly since n8n runs in-cluster. Exit code captured for routing."
+    },
+    {
+      "id": "parse-result",
+      "name": "Parse Exit Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300],
+      "parameters": {
+        "jsCode": "// Parse the command output to extract exit code\nconst stdout = $input.first().json.stdout || '';\nconst stderr = $input.first().json.stderr || '';\n\n// Extract exit code from output\nlet exitCode = 1; // Default to error\nconst exitMatch = stdout.match(/EXIT_CODE=(\\d+)/);\nif (exitMatch) {\n  exitCode = parseInt(exitMatch[1], 10);\n}\n\n// Get previous item data\nconst prevData = $('Set Parameters').first().json;\n\nreturn [{\n  json: {\n    ...prevData,\n    exit_code: exitCode,\n    stdout: stdout.replace(/EXIT_CODE=\\d+\\n?$/, '').trim(),\n    stderr: stderr,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      }
+    },
+    {
+      "id": "switch-exit-code",
+      "name": "Handle Exit Code",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [880, 300],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "outputKey": "Success (0)",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.exit_code }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "Lease Held (23)",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.exit_code }}",
+                    "rightValue": 23,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "Auth Failure (57)",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.exit_code }}",
+                    "rightValue": 57,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "notes": "Routes based on exit codes:\n0 = Success\n23 = Lease held (retry)\n57 = Claude auth failure\nOther = General error"
+    },
+    {
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1200, 100],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'success', ticket_id: $json.ticket_id, phase: $json.phase, agent_name: $json.agent_name, exit_code: $json.exit_code, timestamp: $json.timestamp } }}"
+      }
+    },
+    {
+      "id": "check-retry",
+      "name": "Check Retry Limit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 300],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst canRetry = data.retry_count < data.max_retries;\n\nreturn [{\n  json: {\n    ...data,\n    can_retry: canRetry\n  }\n}];"
+      }
+    },
+    {
+      "id": "retry-switch",
+      "name": "Retry or Fail",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [1420, 300],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "outputKey": "Can Retry",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.can_retry }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      }
+    },
+    {
+      "id": "wait-retry",
+      "name": "Wait Before Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1640, 250],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": "={{ Math.pow(2, $json.retry_count) * 15 }}",
+        "unit": "seconds"
+      },
+      "notes": "Exponential backoff: 15s, 30s, 60s, 120s..."
+    },
+    {
+      "id": "increment-retry",
+      "name": "Increment Retry",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1860, 250],
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "retry_inc",
+              "name": "retry_count",
+              "value": "={{ $json.retry_count + 1 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {
+          "includeOtherFields": true
+        }
+      }
+    },
+    {
+      "id": "max-retries-response",
+      "name": "Max Retries Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1640, 350],
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 409,
+        "responseBody": "={{ { status: 'max_retries_exceeded', ticket_id: $json.ticket_id, exit_code: 23, retry_count: $json.retry_count, message: 'Lease could not be acquired after max retries', timestamp: $json.timestamp } }}"
+      }
+    },
+    {
+      "id": "teams-auth-alert",
+      "name": "Teams Auth Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 500],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TEAMS_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"type\": \"message\",\n  \"attachments\": [{\n    \"contentType\": \"application/vnd.microsoft.card.adaptive\",\n    \"content\": {\n      \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n      \"type\": \"AdaptiveCard\",\n      \"version\": \"1.4\",\n      \"body\": [\n        { \"type\": \"TextBlock\", \"text\": \"🔐 Claude Reauthentication Required\", \"weight\": \"Bolder\", \"size\": \"Large\", \"wrap\": true },\n        { \"type\": \"TextBlock\", \"text\": \"Claude CLI health check failed inside AKS. The mounted Claude Max session tokens are likely expired.\", \"wrap\": true },\n        { \"type\": \"FactSet\", \"facts\": [\n          { \"title\": \"Ticket:\", \"value\": \"{{ $json.ticket_id }}\" },\n          { \"title\": \"Agent:\", \"value\": \"{{ $json.agent_name }}\" },\n          { \"title\": \"Phase:\", \"value\": \"{{ $json.phase }}\" },\n          { \"title\": \"Exit Code:\", \"value\": \"57\" }\n        ]},\n        { \"type\": \"TextBlock\", \"text\": \"Reauth steps (local machine):\", \"weight\": \"Bolder\", \"spacing\": \"Medium\" },\n        { \"type\": \"TextBlock\", \"wrap\": true, \"text\": \"1) claude logout && claude login\\n2) kubectl delete secret claude-session -n claude-agent\\n3) kubectl create secret generic claude-session -n claude-agent --from-file=$HOME/.claude/\\n4) kubectl rollout restart deployment/claude-code-agent -n claude-agent\" }\n      ]\n    }\n  }]\n}",
+        "options": {}
+      },
+      "notes": "Sends adaptive card to Teams when Claude auth fails"
+    },
+    {
+      "id": "auth-fail-response",
+      "name": "Auth Fail Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1420, 500],
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 503,
+        "responseBody": "={{ { status: 'auth_failure', ticket_id: $json.ticket_id, exit_code: 57, message: 'Claude session tokens expired. Teams notification sent.', timestamp: $json.timestamp } }}"
+      }
+    },
+    {
+      "id": "teams-error-alert",
+      "name": "Teams Error Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 700],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TEAMS_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"type\": \"message\",\n  \"attachments\": [{\n    \"contentType\": \"application/vnd.microsoft.card.adaptive\",\n    \"content\": {\n      \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n      \"type\": \"AdaptiveCard\",\n      \"version\": \"1.4\",\n      \"body\": [\n        { \"type\": \"TextBlock\", \"text\": \"⚠️ Claude Agent Error\", \"weight\": \"Bolder\", \"size\": \"Large\", \"wrap\": true, \"color\": \"Attention\" },\n        { \"type\": \"TextBlock\", \"text\": \"Agent execution failed with unexpected error.\", \"wrap\": true },\n        { \"type\": \"FactSet\", \"facts\": [\n          { \"title\": \"Ticket:\", \"value\": \"{{ $json.ticket_id }}\" },\n          { \"title\": \"Agent:\", \"value\": \"{{ $json.agent_name }}\" },\n          { \"title\": \"Phase:\", \"value\": \"{{ $json.phase }}\" },\n          { \"title\": \"Exit Code:\", \"value\": \"{{ $json.exit_code }}\" }\n        ]},\n        { \"type\": \"TextBlock\", \"text\": \"Check pod logs for details.\", \"spacing\": \"Medium\" }\n      ]\n    }\n  }]\n}",
+        "options": {}
+      }
+    },
+    {
+      "id": "error-response",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1420, 700],
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 500,
+        "responseBody": "={{ { status: 'error', ticket_id: $json.ticket_id, exit_code: $json.exit_code, message: 'Agent execution failed', stderr: $json.stderr, timestamp: $json.timestamp } }}"
+      }
+    }
+  ],
+  "connections": {
+    "Agent Run Webhook": {
+      "main": [
+        [{ "node": "Set Parameters", "type": "main", "index": 0 }]
+      ]
+    },
+    "Set Parameters": {
+      "main": [
+        [{ "node": "Run Claude Agent", "type": "main", "index": 0 }]
+      ]
+    },
+    "Run Claude Agent": {
+      "main": [
+        [{ "node": "Parse Exit Code", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Exit Code": {
+      "main": [
+        [{ "node": "Handle Exit Code", "type": "main", "index": 0 }]
+      ]
+    },
+    "Handle Exit Code": {
+      "main": [
+        [{ "node": "Success Response", "type": "main", "index": 0 }],
+        [{ "node": "Check Retry Limit", "type": "main", "index": 0 }],
+        [{ "node": "Teams Auth Alert", "type": "main", "index": 0 }],
+        [{ "node": "Teams Error Alert", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Retry Limit": {
+      "main": [
+        [{ "node": "Retry or Fail", "type": "main", "index": 0 }]
+      ]
+    },
+    "Retry or Fail": {
+      "main": [
+        [{ "node": "Wait Before Retry", "type": "main", "index": 0 }],
+        [{ "node": "Max Retries Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait Before Retry": {
+      "main": [
+        [{ "node": "Increment Retry", "type": "main", "index": 0 }]
+      ]
+    },
+    "Increment Retry": {
+      "main": [
+        [{ "node": "Run Claude Agent", "type": "main", "index": 0 }]
+      ]
+    },
+    "Teams Auth Alert": {
+      "main": [
+        [{ "node": "Auth Fail Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Teams Error Alert": {
+      "main": [
+        [{ "node": "Error Response", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

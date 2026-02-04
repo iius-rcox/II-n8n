@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: claude-agent
+  namespace: claude-agent
+  labels:
+    app: claude-code-agent
+spec:
+  type: ClusterIP
+  selector:
+    app: claude-code-agent
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+    name: http

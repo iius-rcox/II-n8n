@@ -8,7 +8,7 @@ supabase:
     enabled: true
     image:
       repository: supabase/postgres
-      tag: 15.8.1.085
+      tag: 15.14.1.079
       pullPolicy: IfNotPresent
     persistence:
       enabled: true
@@ -29,7 +29,7 @@ supabase:
     enabled: true
     image:
       repository: kong
-      tag: 2.8.1
+      tag: 2.8.5
       pullPolicy: IfNotPresent
     resources:
       requests:
@@ -44,7 +44,7 @@ supabase:
     enabled: true
     image:
       repository: postgrest/postgrest
-      tag: v13.0.7
+      tag: v13.0.8
       pullPolicy: IfNotPresent
     resources:
       requests:
@@ -88,7 +88,7 @@ supabase:
     enabled: true
     image:
       repository: supabase/postgres-meta
-      tag: v0.93.1
+      tag: v0.95.2
       pullPolicy: IfNotPresent
     resources:
       requests:

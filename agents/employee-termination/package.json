@@ -1,0 +1,36 @@
+{
+  "name": "employee-termination-agent",
+  "version": "1.0.0",
+  "description": "Employee Termination Agent - HTTP wrapper for PowerShell script",
+  "main": "server.js",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:contract": "jest tests/api-contract.test.js",
+    "test:unit": "jest tests/server.test.js",
+    "test:n8n": "jest tests/n8n-workflow.test.js",
+    "test:pester": "pwsh -Command \"Invoke-Pester -Path tests -Configuration @{Run=@{PassThru=$true};CodeCoverage=@{Enabled=$true;Path='./Terminate-Employee.ps1'};Output=@{Verbosity='Detailed'}}\"",
+    "test:all": "npm run test:pester && npm test",
+    "lint": "eslint .",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "employee-termination",
+    "azure-relay",
+    "n8n",
+    "powershell"
+  ],
+  "author": "II-US",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "ajv": "^8.12.0",
+    "ajv-formats": "^2.1.1",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

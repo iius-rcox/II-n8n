@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autodesk Compliance Scan Results Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 50;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .alert-critical { color: #dc2626; font-weight: 600; }
+        .alert-warning { color: #f59e0b; font-weight: 600; }
+        .alert-none { color: #16a34a; font-weight: 600; }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">Autodesk Compliance Scan Results</h1>
+                        <p class="text-sm text-gray-500 mt-1">Storage: aboraboranditscans / autodesk-compliance-scans</p>
+                    </div>
+                    <button
+                        id="refreshBtn"
+                        class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+                        onclick="loadScanResults()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+            <!-- Loading State -->
+            <div id="loadingState" class="flex flex-col items-center justify-center py-20 hidden">
+                <div class="spinner mb-4"></div>
+                <p class="text-gray-600">Loading scan results...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="hidden">
+                <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-red-800">Error Loading Data</h3>
+                            <p id="errorMessage" class="text-sm text-red-700 mt-1"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Cards (Clickable Filters) -->
+            <div id="dashboardCards" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 hidden">
+                <div id="filterAll" onclick="setFilter('all')" class="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition ring-2 ring-blue-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Total Machines</p>
+                            <p id="totalMachines" class="text-3xl font-bold text-gray-900 mt-2">0</p>
+                        </div>
+                        <div class="bg-blue-100 rounded-full p-3">
+                            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="filterAutodesk" onclick="setFilter('autodesk')" class="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Autodesk Found</p>
+                            <p id="autodeskFound" class="text-3xl font-bold text-orange-600 mt-2">0</p>
+                        </div>
+                        <div class="bg-orange-100 rounded-full p-3">
+                            <svg class="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="filterFlagged" onclick="setFilter('flagged')" class="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Flagged/Critical</p>
+                            <p id="flaggedMachines" class="text-3xl font-bold text-red-600 mt-2">0</p>
+                        </div>
+                        <div class="bg-red-100 rounded-full p-3">
+                            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="filterClean" onclick="setFilter('clean')" class="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Clean Machines</p>
+                            <p id="cleanMachines" class="text-3xl font-bold text-green-600 mt-2">0</p>
+                        </div>
+                        <div class="bg-green-100 rounded-full p-3">
+                            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search/Filter -->
+            <div id="searchSection" class="bg-white rounded-lg shadow p-4 mb-6 hidden">
+                <div class="flex items-center gap-3">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                        type="text"
+                        id="searchInput"
+                        placeholder="Search by computer, user, product, or serial..."
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        oninput="filterResults()"
+                    />
+                    <span id="resultCount" class="text-sm text-gray-500"></span>
+                </div>
+            </div>
+
+            <!-- Results Table -->
+            <div id="resultsSection" class="bg-white rounded-lg shadow overflow-hidden hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Computer Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Domain</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Users</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Scan Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alert Level</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serials</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Summary</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody" class="bg-white divide-y divide-gray-200">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detailModal" class="modal">
+        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 flex items-center justify-between">
+                <h2 id="modalTitle" class="text-xl font-bold text-white">Scan Details</h2>
+                <button onclick="closeModal()" class="text-white hover:text-gray-200 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1">
+                <div id="modalContent" class="space-y-4">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            storageAccount: 'aboraboranditscans',
+            container: 'autodesk-compliance-scans',
+            sasToken: 'se=2026-02-15T23%3A59%3A59Z&sp=rl&sv=2022-11-02&sr=c&sig=fHF7M/dDy3I5i6tVT83AjWXZ%2B3PelGVRp5oJ85mhJrI%3D',
+        };
+
+        let allScans = [];
+        let filteredScans = [];
+        let currentFilter = 'all';
+        const excludedUsers = ['iiadminrc', 'iiadminbl', 'intelecom'];
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Token is pre-configured, load immediately
+            loadScanResults();
+        });
+
+        async function loadScanResults() {
+            showLoading();
+            hideError();
+
+            try {
+                // List blobs
+                const listUrl = `https://${CONFIG.storageAccount}.blob.core.windows.net/${CONFIG.container}?restype=container&comp=list&${CONFIG.sasToken}`;
+                const listResponse = await fetch(listUrl);
+
+                if (!listResponse.ok) {
+                    throw new Error(`Failed to list blobs: ${listResponse.status} ${listResponse.statusText}`);
+                }
+
+                const xmlText = await listResponse.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+
+                // Extract blob names (only .json files)
+                const blobs = Array.from(xmlDoc.getElementsByTagName('Name'))
+                    .map(node => node.textContent)
+                    .filter(name => name.endsWith('.json'));
+
+                if (blobs.length === 0) {
+                    showError('No scan results found in container');
+                    return;
+                }
+
+                // Fetch all JSON files
+                const scanPromises = blobs.map(async (blobName) => {
+                    const blobUrl = `https://${CONFIG.storageAccount}.blob.core.windows.net/${CONFIG.container}/${blobName}?${CONFIG.sasToken}`;
+                    const response = await fetch(blobUrl);
+                    if (response.ok) {
+                        const data = await response.json();
+                        data._blobName = blobName; // Store for reference
+                        return data;
+                    }
+                    return null;
+                });
+
+                allScans = (await Promise.all(scanPromises)).filter(scan => scan !== null);
+
+                // Sort by scan date (newest first)
+                allScans.sort((a, b) => {
+                    const dateA = new Date(a.ScanDateUTC || a.ScanDate);
+                    const dateB = new Date(b.ScanDateUTC || b.ScanDate);
+                    return dateB - dateA;
+                });
+
+                filteredScans = [...allScans];
+                updateDashboard();
+                renderTable();
+                showResults();
+
+            } catch (error) {
+                console.error('Error loading scan results:', error);
+                showError(`Error: ${error.message}. Check console for details.`);
+            }
+        }
+
+        function updateDashboard() {
+            const total = allScans.length;
+            const autodeskFound = allScans.filter(s => s.AutodeskFound).length;
+            const flagged = allScans.filter(s => s.AlertLevel && s.AlertLevel !== 'None').length;
+            const clean = total - autodeskFound;
+
+            document.getElementById('totalMachines').textContent = total;
+            document.getElementById('autodeskFound').textContent = autodeskFound;
+            document.getElementById('flaggedMachines').textContent = flagged;
+            document.getElementById('cleanMachines').textContent = clean;
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('resultsTableBody');
+            tbody.innerHTML = '';
+
+            if (filteredScans.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                            No results found matching current filter
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            filteredScans.forEach((scan, index) => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 cursor-pointer transition';
+                row.onclick = () => showDetail(scan);
+
+                const alertClass = scan.AlertLevel === 'Critical' ? 'alert-critical' :
+                                  scan.AlertLevel === 'Warning' ? 'alert-warning' : 'alert-none';
+
+                const scanDate = new Date(scan.ScanDateUTC || scan.ScanDate).toLocaleString();
+
+                // Get filtered users (excluding admin accounts)
+                const users = getFilteredUsers(scan.AllUsers);
+                const userNames = users.map(u => {
+                    const name = u.Username || '';
+                    return name.includes('\\') ? name.split('\\')[1] : name;
+                }).filter(n => n);
+
+                const allUsersList = normalizeUsers(scan.AllUsers);
+                const totalUsers = allUsersList.length > 0 ? allUsersList.length : null;
+                const usersScanned = Number.isFinite(scan.UsersScanned) ? scan.UsersScanned : null;
+                const userScanLabel = (usersScanned !== null || totalUsers !== null)
+                    ? `${usersScanned ?? 0}/${totalUsers ?? (usersScanned ?? 0)} scanned`
+                    : '';
+
+                const products = Array.isArray(scan.Products) ? scan.Products : [];
+                const flaggedProducts = Array.isArray(scan.FlaggedProducts) && scan.FlaggedProducts.length > 0
+                    ? scan.FlaggedProducts
+                    : products.filter(p => p && p.IsFlagged);
+                const priorities = products.map(p => (p && p.Priority ? String(p.Priority).toLowerCase() : ''));
+                const highestPriority = priorities.includes('high') ? 'High' :
+                    priorities.includes('medium') ? 'Medium' :
+                    priorities.includes('low') ? 'Low' : '';
+
+                let summaryText = normalizeSummaryText((scan.Summary || '').trim(), userScanLabel);
+                if (!summaryText) {
+                    const parts = [];
+                    if (userScanLabel) parts.push(`Users: ${userScanLabel}`);
+                    if (products.length > 0) parts.push(`Products: ${products.length}`);
+                    if (flaggedProducts.length > 0) parts.push(`Flagged: ${flaggedProducts.length}`);
+                    if (highestPriority) parts.push(`Highest: ${highestPriority}`);
+                    summaryText = parts.join(' | ');
+                } else {
+                    const extras = [];
+                    if (flaggedProducts.length > 0) extras.push(`Flagged: ${flaggedProducts.length}`);
+                    if (highestPriority) extras.push(`Highest: ${highestPriority}`);
+                    if (extras.length > 0) summaryText = `${summaryText} | ${extras.join(' | ')}`;
+                }
+
+                const serialList = collectSerials(scan);
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${escapeHtml(scan.ComputerName || 'N/A')}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapeHtml(scan.Domain || 'N/A')}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        ${userScanLabel ? `<div class="text-gray-700 font-medium">${escapeHtml(userScanLabel)}</div>` : ''}
+                        ${userNames.length > 0 ? userNames.map(n => escapeHtml(n)).join(', ') : '<span class="text-gray-400">None</span>'}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${scanDate}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${alertClass}">${scan.AlertLevel || 'None'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        ${serialList.length > 0 ? serialList.map(s => s.flagged
+                            ? `<span class="text-red-600 font-semibold">${escapeHtml(s.value)}</span>`
+                            : s.placeholder
+                                ? `<span class="text-gray-400">${escapeHtml(s.value)} (placeholder)</span>`
+                                : escapeHtml(s.value)
+                        ).join(', ') : '<span class="text-gray-400">None</span>'}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500">${escapeHtml(summaryText || 'No summary')}</td>
+                `;
+
+                tbody.appendChild(row);
+            });
+
+            document.getElementById('resultCount').textContent = `${filteredScans.length} of ${allScans.length} results`;
+        }
+
+        function filterResults() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            filteredScans = allScans.filter(scan => {
+                // Text search filter
+                let matchesSearch = (scan.ComputerName || '').toLowerCase().includes(searchTerm);
+                if (!matchesSearch && searchTerm) {
+                    const users = getFilteredUsers(scan.AllUsers);
+                    matchesSearch = users.some(u => {
+                        const username = (u.Username || '').toLowerCase();
+                        const shortName = username.includes('\\') ? username.split('\\')[1] : username;
+                        return username.includes(searchTerm) || shortName.includes(searchTerm);
+                    });
+                }
+                if (!matchesSearch && searchTerm) {
+                    const products = Array.isArray(scan.Products) ? scan.Products : [];
+                    matchesSearch = products.some(p => {
+                        const name = (getFirstValue(p, ['ProductName', 'Name'], '') || '').toLowerCase();
+                        const version = (getFirstValue(p, ['Version'], '') || '').toLowerCase();
+                        const installPath = (getFirstValue(p, ['InstallPath', 'InstallLocation'], '') || '').toLowerCase();
+                        const serial = (getFirstValue(p, ['RegistrySerials', 'Serial', 'SerialNumber'], '') || '').toLowerCase();
+                        return name.includes(searchTerm) ||
+                            version.includes(searchTerm) ||
+                            installPath.includes(searchTerm) ||
+                            serial.includes(searchTerm);
+                    });
+                }
+                if (!matchesSearch && searchTerm) {
+                    const registrySerials = normalizeSerials(scan.RegistrySerials);
+                    matchesSearch = registrySerials.some(s => {
+                        const value = (s && s.Value ? String(s.Value) : '').toLowerCase();
+                        const property = (s && s.Property ? String(s.Property) : '').toLowerCase();
+                        return value.includes(searchTerm) || property.includes(searchTerm);
+                    });
+                }
+
+                // Card filter
+                let matchesCardFilter = true;
+                if (currentFilter === 'autodesk') {
+                    matchesCardFilter = scan.AutodeskFound;
+                } else if (currentFilter === 'flagged') {
+                    matchesCardFilter = scan.AlertLevel && scan.AlertLevel !== 'None';
+                } else if (currentFilter === 'clean') {
+                    matchesCardFilter = !scan.AutodeskFound;
+                }
+
+                return matchesSearch && matchesCardFilter;
+            });
+            renderTable();
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+
+            // Update card styling
+            ['filterAll', 'filterAutodesk', 'filterFlagged', 'filterClean'].forEach(id => {
+                document.getElementById(id).classList.remove('ring-2', 'ring-blue-500', 'ring-orange-500', 'ring-red-500', 'ring-green-500');
+            });
+
+            const ringColor = {
+                'all': 'ring-blue-500',
+                'autodesk': 'ring-orange-500',
+                'flagged': 'ring-red-500',
+                'clean': 'ring-green-500'
+            };
+
+            const filterId = {
+                'all': 'filterAll',
+                'autodesk': 'filterAutodesk',
+                'flagged': 'filterFlagged',
+                'clean': 'filterClean'
+            };
+
+            document.getElementById(filterId[filter]).classList.add('ring-2', ringColor[filter]);
+            filterResults();
+        }
+
+        function normalizeUsers(allUsers) {
+            if (!allUsers) return [];
+            if (Array.isArray(allUsers)) return allUsers;
+            if (typeof allUsers === 'object') return [allUsers];
+            return [];
+        }
+
+        function getFilteredUsers(allUsers) {
+            const users = normalizeUsers(allUsers);
+            if (users.length === 0) return [];
+            return users.filter(user => {
+                const username = (user.Username || '').toLowerCase();
+                // Extract just the username part (after domain\)
+                const shortName = username.includes('\\') ? username.split('\\')[1] : username;
+
+                // Exclude specific admin users
+                if (excludedUsers.some(excluded => shortName.includes(excluded.toLowerCase()))) {
+                    return false;
+                }
+
+                // Exclude service accounts
+                if (username.includes('iis apppool') ||
+                    username.includes('nt service') ||
+                    username.includes('pbiegwservice') ||
+                    username.includes('uiflowservice') ||
+                    shortName.startsWith('.net v')) {
+                    return false;
+                }
+
+                return true;
+            });
+        }
+
+        function getFirstValue(obj, keys, fallback = '') {
+            if (!obj) return fallback;
+            for (const key of keys) {
+                const value = obj[key];
+                if (value !== undefined && value !== null && value !== '') {
+                    return value;
+                }
+            }
+            return fallback;
+        }
+
+        function normalizeSerials(serials) {
+            if (!serials) return [];
+            if (Array.isArray(serials)) return serials;
+            if (typeof serials === 'object') return [serials];
+            return [];
+        }
+
+        function normalizePriority(priority) {
+            const value = String(priority || '').trim().toLowerCase();
+            if (value === 'high') return 'High';
+            if (value === 'medium') return 'Medium';
+            if (value === 'low') return 'Low';
+            return 'Other';
+        }
+
+        function normalizeSummaryText(summaryText, userScanLabel) {
+            if (!summaryText) return summaryText;
+            if (!userScanLabel) return summaryText;
+            let normalized = summaryText;
+            normalized = normalized.replace(/Users:\s*\d+\s*\/\s*scanned/gi, `Users: ${userScanLabel}`);
+            normalized = normalized.replace(/Users:\s*\/\s*scanned/gi, `Users: ${userScanLabel}`);
+            return normalized;
+        }
+
+        function collectSerials(scan) {
+            const serialEntries = [];
+            const registrySerials = normalizeSerials(scan.RegistrySerials);
+            registrySerials.forEach(s => {
+                const value = s && s.Value ? String(s.Value) : '';
+                if (value) {
+                    serialEntries.push({ value, flagged: !!s.Flagged, placeholder: !!s.Placeholder });
+                }
+            });
+            const products = Array.isArray(scan.Products) ? scan.Products : [];
+            products.forEach(p => {
+                const value = getFirstValue(p, ['RegistrySerials', 'Serial', 'SerialNumber'], '');
+                if (value) {
+                    serialEntries.push({ value: String(value), flagged: !!p.IsFlagged, placeholder: false });
+                }
+            });
+            const serialMap = new Map();
+            serialEntries.forEach(entry => {
+                const key = entry.value;
+                if (!serialMap.has(key)) {
+                    serialMap.set(key, { value: entry.value, flagged: entry.flagged, placeholder: entry.placeholder });
+                } else {
+                    const current = serialMap.get(key);
+                    if (entry.flagged) current.flagged = true;
+                    if (entry.placeholder) current.placeholder = true;
+                }
+            });
+            return Array.from(serialMap.values());
+        }
+
+        function buildProductCard(p) {
+            const name = escapeHtml(getFirstValue(p, ['ProductName', 'Name'], 'Unknown Product'));
+            const version = escapeHtml(getFirstValue(p, ['Version'], ''));
+            const installPath = escapeHtml(getFirstValue(p, ['InstallPath', 'InstallLocation'], ''));
+            const username = escapeHtml(getFirstValue(p, ['Username', 'User', 'UserName'], ''));
+            const userContext = escapeHtml(getFirstValue(p, ['UserContext'], ''));
+            const source = escapeHtml(getFirstValue(p, ['Source'], ''));
+            const priority = escapeHtml(getFirstValue(p, ['Priority'], ''));
+            const flagReason = escapeHtml(getFirstValue(p, ['FlagReason'], ''));
+            const serial = escapeHtml(getFirstValue(p, ['RegistrySerials', 'Serial', 'SerialNumber'], ''));
+            return `
+                <div class="border border-gray-200 rounded-lg p-3">
+                    <p class="font-medium text-gray-900">${name}</p>
+                    <div class="text-xs text-gray-500 mt-1 space-y-1">
+                        ${version ? `<p>Version: ${version}</p>` : ''}
+                        ${installPath ? `<p>Install Path: ${installPath}</p>` : ''}
+                        ${username ? `<p>Username: ${username}</p>` : ''}
+                        ${userContext ? `<p>Context: ${userContext}</p>` : ''}
+                        ${source ? `<p>Source: ${source}</p>` : ''}
+                        ${priority ? `<p>Priority: ${priority}</p>` : ''}
+                        ${flagReason ? `<p>Flag Reason: ${flagReason}</p>` : ''}
+                        ${serial ? `<p>Serial: ${serial}</p>` : ''}
+                        ${p.IsFlagged ? '<p class="text-red-600 font-semibold">FLAGGED</p>' : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function buildFlaggedProductCard(p) {
+            const name = escapeHtml(getFirstValue(p, ['ProductName', 'Name'], 'Unknown Product'));
+            const username = escapeHtml(getFirstValue(p, ['Username', 'User', 'UserName'], ''));
+            const userContext = escapeHtml(getFirstValue(p, ['UserContext'], ''));
+            const flagReason = escapeHtml(getFirstValue(p, ['FlagReason'], ''));
+            const priority = escapeHtml(getFirstValue(p, ['Priority'], ''));
+            return `
+                <div class="border border-red-300 bg-red-50 rounded-lg p-3">
+                    <p class="font-medium text-red-900">${name}</p>
+                    <div class="text-xs text-red-700 mt-1">
+                        ${username ? `<p>Username: ${username}</p>` : ''}
+                        ${userContext ? `<p>Context: ${userContext}</p>` : ''}
+                        ${priority ? `<p>Priority: ${priority}</p>` : ''}
+                        ${flagReason ? `<p>Flag Reason: ${flagReason}</p>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function showDetail(scan) {
+            document.getElementById('modalTitle').textContent = `${scan.ComputerName} - Scan Details`;
+
+            const content = document.getElementById('modalContent');
+            const products = Array.isArray(scan.Products) ? scan.Products : [];
+            const flaggedProducts = Array.isArray(scan.FlaggedProducts) && scan.FlaggedProducts.length > 0
+                ? scan.FlaggedProducts
+                : products.filter(p => p && p.IsFlagged);
+            const serialList = collectSerials(scan);
+            const serialListHtml = serialList.length > 0
+                ? serialList.map(s => s.flagged
+                    ? `<span class="text-red-600 font-semibold">${escapeHtml(s.value)}</span>`
+                    : s.placeholder
+                        ? `<span class="text-gray-400">${escapeHtml(s.value)} (placeholder)</span>`
+                        : escapeHtml(s.value)
+                ).join(', ')
+                : '<span class="text-gray-400">None</span>';
+            const productGroups = { High: [], Medium: [], Low: [], Other: [] };
+            products.forEach(p => {
+                const group = normalizePriority(p && p.Priority);
+                productGroups[group].push(p);
+            });
+            const productGroupsHtml = ['High', 'Medium', 'Low', 'Other'].map(group => {
+                const items = productGroups[group];
+                if (!items.length) return '';
+                return `
+                    <div class="mb-4">
+                        <p class="text-sm font-semibold text-gray-700">${group} Priority (${items.length})</p>
+                        <div class="space-y-2 mt-2">
+                            ${items.map(buildProductCard).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            content.innerHTML = `
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="text-xs text-gray-500 uppercase">Computer Name</p>
+                        <p class="text-lg font-semibold text-gray-900">${escapeHtml(scan.ComputerName)}</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="text-xs text-gray-500 uppercase">Domain</p>
+                        <p class="text-lg font-semibold text-gray-900">${escapeHtml(scan.Domain)}</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="text-xs text-gray-500 uppercase">Scan Date</p>
+                        <p class="text-lg font-semibold text-gray-900">${new Date(scan.ScanDateUTC || scan.ScanDate).toLocaleString()}</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="text-xs text-gray-500 uppercase">Alert Level</p>
+                        <p class="text-lg font-semibold ${scan.AlertLevel === 'Critical' ? 'text-red-600' : scan.AlertLevel === 'Warning' ? 'text-orange-600' : 'text-green-600'}">${scan.AlertLevel || 'None'}</p>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                    <p class="text-xs text-gray-500 uppercase mb-2">Summary</p>
+                    <p class="text-sm text-gray-900">${escapeHtml(scan.Summary)}</p>
+                </div>
+
+                <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                    <p class="text-xs text-gray-500 uppercase mb-2">Serial Numbers</p>
+                    <p class="text-sm text-gray-900">${serialListHtml}</p>
+                </div>
+
+                ${scan.AutodeskFound ? `
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4 mb-6">
+                        <p class="text-sm font-semibold text-orange-800">Autodesk Software Detected</p>
+                    </div>
+                ` : ''}
+
+                ${products.length > 0 ? `
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold mb-3">Products Found (${products.length})</h3>
+                        ${productGroupsHtml}
+                    </div>
+                ` : ''}
+
+                ${flaggedProducts.length > 0 ? `
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-red-600 mb-3">Flagged Products (${flaggedProducts.length})</h3>
+                        <div class="space-y-2">
+                            ${flaggedProducts.map(buildFlaggedProductCard).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-gray-50 p-3 rounded-lg text-center">
+                        <p class="text-xs text-gray-500">Running As</p>
+                        <p class="text-sm font-semibold text-gray-900 mt-1">${escapeHtml(scan.RunningAs)}</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded-lg text-center">
+                        <p class="text-xs text-gray-500">Users Scanned</p>
+                        <p class="text-sm font-semibold text-gray-900 mt-1">${scan.UsersScanned || 0} / ${normalizeUsers(scan.AllUsers).length}</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded-lg text-center">
+                        <p class="text-xs text-gray-500">Scan Complete</p>
+                        <p class="text-sm font-semibold ${scan.ScanComplete ? 'text-green-600' : 'text-red-600'} mt-1">${scan.ScanComplete ? 'Yes' : 'No'}</p>
+                    </div>
+                </div>
+
+                ${scan.Errors && scan.Errors.length > 0 ? `
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                        <p class="text-sm font-semibold text-red-800 mb-2">Errors (${scan.Errors.length})</p>
+                        <ul class="list-disc list-inside text-sm text-red-700 space-y-1">
+                            ${scan.Errors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+
+                ${scan.Warnings && scan.Warnings.length > 0 ? `
+                    <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
+                        <p class="text-sm font-semibold text-yellow-800 mb-2">Warnings (${scan.Warnings.length})</p>
+                        <ul class="list-disc list-inside text-sm text-yellow-700 space-y-1">
+                            ${scan.Warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+
+                ${normalizeUsers(scan.AllUsers).length > 0 ? `
+                    <div class="mb-4">
+                        <details class="border border-gray-200 rounded-lg">
+                            <summary class="cursor-pointer p-3 font-semibold text-gray-700 hover:bg-gray-50">All Users (${normalizeUsers(scan.AllUsers).length})</summary>
+                            <div class="p-3 bg-gray-50 space-y-2">
+                                ${normalizeUsers(scan.AllUsers).map(u => `
+                                    <div class="text-sm border-b border-gray-200 pb-2">
+                                        <p class="font-medium">${escapeHtml(u.Username)}</p>
+                                        <p class="text-xs text-gray-500">SID: ${escapeHtml(u.SID || 'N/A')}</p>
+                                        ${u.LastUseTime ? `<p class="text-xs text-gray-500">Last Use: ${u.LastUseTime}</p>` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </details>
+                    </div>
+                ` : ''}
+
+                <div class="text-xs text-gray-400 text-right mt-6">
+                    File: ${escapeHtml(scan._blobName)}
+                </div>
+            `;
+
+            document.getElementById('detailModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('active');
+        }
+
+        function showLoading() {
+            document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('errorState').classList.add('hidden');
+            document.getElementById('dashboardCards').classList.add('hidden');
+            document.getElementById('searchSection').classList.add('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+        }
+
+        function showResults() {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('errorState').classList.add('hidden');
+            document.getElementById('dashboardCards').classList.remove('hidden');
+            document.getElementById('searchSection').classList.remove('hidden');
+            document.getElementById('resultsSection').classList.remove('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('errorState').classList.remove('hidden');
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('dashboardCards').classList.add('hidden');
+            document.getElementById('searchSection').classList.add('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+        }
+
+        function hideError() {
+            document.getElementById('errorState').classList.add('hidden');
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        // Close modal on backdrop click
+        document.getElementById('detailModal').addEventListener('click', (e) => {
+            if (e.target.id === 'detailModal') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
